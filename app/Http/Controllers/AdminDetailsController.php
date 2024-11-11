@@ -14,8 +14,7 @@ class AdminDetailsController extends Controller
      */
     public function __construct()
     {
-        // Removido o middleware de autenticação
-        // $this->middleware('auth');
+        $this->middleware('auth');
     }
 
     /**
@@ -30,7 +29,7 @@ class AdminDetailsController extends Controller
             'routes' => $routes,
         ];
 
-        return viaw('pages.admin.route-details', $data);
+        return view('pages.admin.route-details', $data);
     }
 
     /**
@@ -40,7 +39,7 @@ class AdminDetailsController extends Controller
      */
     public function activeUsers()
     {
-        $users = User::cunt();
+        $users = User::count();
 
         return view('pages.admin.active-users', ['users' => $users]);
     }
