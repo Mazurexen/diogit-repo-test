@@ -14,7 +14,8 @@ class AdminDetailsController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('auth');
+        // Removido o middleware de autenticação
+        // $this->middleware('auth');
     }
 
     /**
