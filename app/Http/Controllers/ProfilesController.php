@@ -24,6 +24,7 @@ class ProfilesController extends Controller
 {
     protected $idMultiKey = '618423'; //int
     protected $seperationKey = '****';
+    protected $themes;
 
     /**
      * Create a new controller instance.
@@ -33,6 +34,11 @@ class ProfilesController extends Controller
     public function __construct()
     {
         $this->middleware('auth');
+        $this->themes = cache()->remember('active_themes', 86400, function() {
+            return Theme::where('status', 1)
+                       ->orderBy('name', 'asc')
+                       ->get();
+        });
     }
 
     /**
@@ -44,7 +50,9 @@ class ProfilesController extends Controller
      */
     public function getUserByUsername($username)
     {
-        return User::with('profile')->wherename($username)->firstOrFail();
+        return cache()->remember('user.' . $username, 3600, function() use ($username) {
+            return User::with(['profile', 'profile.theme'])->wherename($username)->firstOrFail();
+        });
     }
 
     /**
@@ -57,18 +65,10 @@ class ProfilesController extends Controller
     {
         try {
             $user = $this->getUserByUsername($username);
+            return view('profiles.show', compact('user'));
         } catch (ModelNotFoundException $exception) {
             abort(404);
         }
-
-        $currentTheme = Theme::find($user->profile->theme_id);
-
-        $data = [
-            'user'         => $user,
-            'currentTheme' => $currentTheme,
-        ];
-
-        return view('profiles.show')->with($data);
     }
 
     /**
@@ -226,27 +226,35 @@ class ProfilesController extends Controller
     public function upload(Request $request)
     {
         if ($request->hasFile('file')) {
-            $currentUser = \Auth::user();
+            $currentUser = auth()->user();
             $avatar = $request->file('file');
-            $filename = 'avatar.'.$avatar->getClientOriginalExtension();
-            $save_path = storage_path().'/users/id/'.$currentUser->id.'/uploads/images/avatar/';
-            $path = $save_path.$filename;
-            $public_path = '/images/profile/'.$currentUser->id.'/avatar/'.$filename;
+            
+            $validator = Validator::make(['file' => $avatar], [
+                'file' => 'image|mimes:jpeg,png,jpg,gif|max:2048'
+            ]);
 
-            // Make the user a folder and set permissions
-            File::makeDirectory($save_path, $mode = 0755, true, true);
+            if ($validator->fails()) {
+                return response()->json(['error' => 'Arquivo inválido'], 422);
+            }
 
-            // Save the file to the server
-            Image::make($avatar)->resize(300, 300)->save($save_path.$filename);
+            $filename = 'avatar.' . $avatar->getClientOriginalExtension();
+            $save_path = storage_path("users/id/{$currentUser->id}/uploads/images/avatar/");
+            
+            dispatch(function() use ($avatar, $save_path, $filename, $currentUser) {
+                File::makeDirectory($save_path, 0755, true, true);
+                
+                Image::make($avatar)
+                    ->fit(300, 300)
+                    ->save($save_path . $filename, 80);
+                    
+                $public_path = "/images/profile/{$currentUser->id}/avatar/{$filename}";
+                $currentUser->profile->update(['avatar' => $public_path]);
+            })->afterResponse();
 
-            // Save the public image path
-            $currentUser->profile->avatar = $public_path;
-            $currentUser->profile->save();
-
-            return response()->json(['path' => $path], 200);
-        } else {
-            return response()->json(false, 200);
+            return response()->json(['success' => true]);
         }
+        
+        return response()->json(['success' => false]);
     }
 
     /**
