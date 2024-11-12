@@ -2,20 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Role;
 use App\Models\User;
-use App\Services\UserService;
-use App\Http\Requests\StoreUserRequest;
+use App\Models\Role;
+use App\Http\Requests\CreateUserRequest;
 use App\Http\Requests\UpdateUserRequest;
-use App\Traits\CaptureIpTrait;
-use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Auth;
+use App\Services\UserService;
 
 class UsersManagementController extends Controller
 {
-    protected $userService;
-
+    private $userService;
+    
     public function __construct(UserService $userService)
     {
         $this->middleware('auth');
@@ -27,24 +23,23 @@ class UsersManagementController extends Controller
         $users = config('usersmanagement.enablePagination')
             ? User::paginate(config('usersmanagement.paginateListSize'))
             : User::all();
-
-        return view('usersmanagement.show-users', [
+            
+        return View('usersmanagement.show-users', [
             'users' => $users,
             'roles' => Role::all()
         ]);
     }
 
-    public function create()
+    public function store(CreateUserRequest $request)
     {
-        return view('usersmanagement.create-user', [
-            'roles' => Role::all()
-        ]);
+        $this->userService->createUser($request->validated());
+        return redirect('users')->with('success', trans('usersmanagement.createSuccess'));
     }
 
-    public function store(StoreUserRequest $request)
+    public function update(UpdateUserRequest $request, User $user)
     {
-        $this->userService->create($request->validated());
-        return redirect('users')->with('success', trans('usersmanagement.createSuccess'));
+        $this->userService->updateUser($user, $request->validated());
+        return back()->with('success', trans('usersmanagement.updateSuccess'));
     }
 
     public function show(User $user)
@@ -54,46 +49,71 @@ class UsersManagementController extends Controller
 
     public function edit(User $user)
     {
-        $currentRole = $user->roles->first();
-        
-        return view('usersmanagement.edit-user', [
-            'user' => $user,
-            'roles' => Role::all(),
-            'currentRole' => $currentRole
-        ]);
-    }
+        $roles = Role::all();
 
-    public function update(UpdateUserRequest $request, User $user)
-    {
-        $this->userService->update($user, $request->validated());
-        return back()->with('success', trans('usersmanagement.updateSuccess'));
+        foreach ($user->roles as $userRole) {
+            $currentRole = $userRole;
+        }
+
+        $data = [
+            'user'        => $user,
+            'roles'       => $roles,
+            'currentRole' => $currentRole,
+        ];
+
+        return view('usersmanagement.edit-user')->with($data);
     }
 
     public function destroy(User $user)
     {
-        if ($user->id === Auth::id()) {
-            return back()->with('error', trans('usersmanagement.deleteSelfError'));
+        $currentUser = Auth::user();
+        $ipAddress = new CaptureIpTrait();
+
+        if ($user->id !== $currentUser->id) {
+            $user->deleted_ip_address = $ipAddress->getClientIp();
+            $user->save();
+            $user->delete();
+
+            return redirect('users')->with('success', trans('usersmanagement.deleteSuccess'));
         }
 
-        $user->deleted_ip_address = (new CaptureIpTrait)->getClientIp();
-        $user->save();
-        $user->delete();
-
-        return redirect('users')->with('success', trans('usersmanagement.deleteSuccess'));
+        return back()->with('error', trans('usersmanagement.deleteSelfError'));
     }
 
     public function search(Request $request)
     {
-        $validated = $request->validate([
-            'user_search_box' => 'required|string|max:255'
-        ]);
+        $searchTerm = $request->input('user_search_box');
+        $searchRules = [
+            'user_search_box' => 'required|string|max:255',
+        ];
+        $searchMessages = [
+            'user_search_box.required' => 'Search term is required',
+            'user_search_box.string'   => 'Search term has invalid characters',
+            'user_search_box.max'      => 'Search term has too many characters - 255 allowed',
+        ];
 
-        $results = User::where('id', 'like', $validated['user_search_box'].'%')
-            ->orWhere('name', 'like', $validated['user_search_box'].'%')
-            ->orWhere('email', 'like', $validated['user_search_box'].'%')
-            ->with('roles')
-            ->get();
+        $validator = Validator::make($request->all(), $searchRules, $searchMessages);
 
-        return response()->json($results, Response::HTTP_OK);
+        if ($validator->fails()) {
+            return response()->json([
+                json_encode($validator),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $results = User::where('id', 'like', $searchTerm.'%')
+                            ->orWhere('name', 'like', $searchTerm.'%')
+                            ->orWhere('email', 'like', $searchTerm.'%')->get();
+
+        // Attach roles to results
+        foreach ($results as $result) {
+            $roles = [
+                'roles' => $result->roles,
+            ];
+            $result->push($roles);
+        }
+
+        return response()->json([
+            json_encode($results),
+        ], Response::HTTP_OK);
     }
 }

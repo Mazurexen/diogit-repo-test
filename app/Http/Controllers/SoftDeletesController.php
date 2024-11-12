@@ -5,12 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class SoftDeletesController extends Controller
 {
     /**
-     * Create a new controller instance.
-     *
      * @return void
      */
     public function __construct()
@@ -19,73 +20,60 @@ class SoftDeletesController extends Controller
     }
 
     /**
-     * Get Soft Deleted User.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @return View
      */
-    public static function getDeletedUser($id)
+    public function index(): View
     {
-        $user = User::onlyTrashed()->where('id', $id)->get();
-        if (count($user) !== 1) {
-            return redirect('/users/deleted/')->with('error', trans('usersmanagement.errorUserNotFound'));
-        }
-
-        return $user[0];
+        return view('usersmanagement.show-deleted-users', [
+            'users' => User::onlyTrashed()->get(),
+            'roles' => Role::all()
+        ]);
     }
 
     /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
+     * @param int $id
+     * @return View
      */
-    public function index()
+    public function show(int $id): View
     {
-        $users = User::onlyTrashed()->get();
-        $roles = Role::all();
-
-        return View('usersmanagement.show-deleted-users', compact('users', 'roles'));
+        return view('usersmanagement.show-deleted-user', [
+            'user' => $this->findDeletedUserOrFail($id)
+        ]);
     }
 
     /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @param Request $request
+     * @param int $id
+     * @return RedirectResponse
      */
-    public function show($id)
+    public function update(Request $request, int $id): RedirectResponse
     {
-        $user = self::getDeletedUser($id);
+        $this->findDeletedUserOrFail($id)->restore();
 
-        return view('usersmanagement.show-deleted-user')->withUser($user);
+        return redirect('/users/')
+            ->with('success', trans('usersmanagement.successRestore'));
     }
 
     /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @param int $id
+     * @return RedirectResponse
      */
-    public function update(Request $request, $id)
+    public function destroy(int $id): RedirectResponse
     {
-        $user = self::getDeletedUser($id);
-        $user->restore();
+        $this->findDeletedUserOrFail($id)->forceDelete();
 
-        return redirect('/users/')->with('success', trans('usersmanagement.successRestore'));
+        return redirect('/users/deleted/')
+            ->with('success', trans('usersmanagement.successDestroy'));
     }
 
     /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @param int $id
+     * @return User
      */
-    public function destroy($id)
+    private function findDeletedUserOrFail(int $id): User
     {
-        $user = self::getDeletedUser($id);
-        $user->forceDelete();
-
-        return redirect('/users/deleted/')->with('success', trans('usersmanagement.successDestroy'));
+        return User::onlyTrashed()
+            ->where('id', $id)
+            ->firstOrFail();
     }
 }

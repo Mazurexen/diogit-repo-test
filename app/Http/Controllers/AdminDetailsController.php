@@ -3,47 +3,44 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Contracts\View\View;
 
 class AdminDetailsController extends Controller
 {
     /**
      * Create a new controller instance.
+     *
+     * @return void
      */
     public function __construct()
     {
-        $this->middleware(['auth', 'admin']);
+        $this->middleware('auth');
     }
 
     /**
-     * Exibe lista de rotas do sistema.
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
      */
-    public function listRoutes(): View
+    public function listRoutes()
     {
-        $routes = collect(Route::getRoutes())
-            ->map(function ($route) {
-                return [
-                    'method' => $route->methods()[0],
-                    'uri' => $route->uri(),
-                    'name' => $route->getName(),
-                    'action' => $route->getActionName()
-                ];
-            });
+        $routes = Route::getRoutes();
+        $data = [
+            'routes' => $routes,
+        ];
 
-        return view('pages.admin.route-details', compact('routes'));
+        return view('pages.admin.route-details', $data);
     }
 
     /**
-     * Exibe página de usuários ativos.
+     * Display active users page.
+     *
+     * @return \Illuminate\Http\Response
      */
-    public function activeUsers(): View
+    public function activeUsers()
     {
-        $users = User::query()
-            ->where('active', true)
-            ->count();
+        $users = User::count();
 
-        return view('pages.admin.active-users', compact('users'));
+        return view('pages.admin.active-users', ['users' => $users]);
     }
 }
