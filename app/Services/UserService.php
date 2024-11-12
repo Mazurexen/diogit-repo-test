@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\Profile;
 use App\Traits\CaptureIpTrait;
+
         ]);
 
         $user->profile()->save(new Profile());
@@ -12,5 +13,4 @@ use App\Traits\CaptureIpTrait;
         
         return $user;
     }
-
 

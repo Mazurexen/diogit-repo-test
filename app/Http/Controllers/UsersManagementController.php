@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+
     public function __construct(UserService $userService)
     {
         $this->middleware('auth');
@@ -13,10 +14,12 @@ namespace App\Http\Controllers;
         $users = config('usersmanagement.enablePagination')
             ? User::paginate(config('usersmanagement.paginateListSize'))
             : User::all();
+
             'users' => $users,
             'roles' => Role::all()
         ]);
     }
+
 
     }
 
@@ -38,15 +41,7 @@ namespace App\Http\Controllers;
 
     public function destroy(User $user)
     {
-        if ($user->id === Auth::id()) {
-            return back()->with('error', trans('usersmanagement.deleteSelfError'));
-        }
 
-        $user->deleted_ip_address = (new CaptureIpTrait)->getClientIp();
-        $user->save();
-        $user->delete();
-
-        return redirect('users')->with('success', trans('usersmanagement.deleteSuccess'));
     }
 
     public function search(Request $request)
