@@ -24,7 +24,8 @@ class DeleteUserAccount extends FormRequest
     public function rules()
     {
         return [
-            'checkConfirmDelete' => 'required',
+            'checkConfirmDelete' => 'required|accepted',
+            'current_password' => 'required|current_password',
         ];
     }
 
@@ -37,6 +38,9 @@ class DeleteUserAccount extends FormRequest
     {
         return [
             'checkConfirmDelete.required' => trans('profile.confirmDeleteRequired'),
+            'checkConfirmDelete.accepted' => trans('profile.mustAcceptDeletion'),
+            'current_password.required' => trans('auth.currentPasswordRequired'),
+            'current_password.current_password' => trans('auth.currentPasswordInvalid'),
         ];
     }
 }
