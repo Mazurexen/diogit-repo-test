@@ -2,20 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Role;
-use App\Models\User;
-use App\Services\UserService;
-use App\Http\Requests\StoreUserRequest;
-use App\Http\Requests\UpdateUserRequest;
-use App\Traits\CaptureIpTrait;
-use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Auth;
-
-class UsersManagementController extends Controller
-{
-    protected $userService;
-
     public function __construct(UserService $userService)
     {
         $this->middleware('auth');
@@ -27,24 +13,11 @@ class UsersManagementController extends Controller
         $users = config('usersmanagement.enablePagination')
             ? User::paginate(config('usersmanagement.paginateListSize'))
             : User::all();
-
-        return view('usersmanagement.show-users', [
             'users' => $users,
             'roles' => Role::all()
         ]);
     }
 
-    public function create()
-    {
-        return view('usersmanagement.create-user', [
-            'roles' => Role::all()
-        ]);
-    }
-
-    public function store(StoreUserRequest $request)
-    {
-        $this->userService->create($request->validated());
-        return redirect('users')->with('success', trans('usersmanagement.createSuccess'));
     }
 
     public function show(User $user)
@@ -61,12 +34,6 @@ class UsersManagementController extends Controller
             'roles' => Role::all(),
             'currentRole' => $currentRole
         ]);
-    }
-
-    public function update(UpdateUserRequest $request, User $user)
-    {
-        $this->userService->update($user, $request->validated());
-        return back()->with('success', trans('usersmanagement.updateSuccess'));
     }
 
     public function destroy(User $user)
